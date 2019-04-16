@@ -109,7 +109,7 @@ cron (master)$ components
     service:  'lambda.amazonaws.com'
     policy:  { arn: 'arn:aws:iam::aws:policy/AdministratorAccess' }
   arn:  'arn:aws:lambda:us-east-1:552760238299:function:cron-job'
-  rate:  '2m'
+  rate:  '5m'
   enabled:  true
 
 
