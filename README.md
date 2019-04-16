@@ -72,6 +72,7 @@ Cron:
     # or a cron expresion  
     rate: 5m 
     enabled: true # this is the default value
+    handler: cron.handler # this is the default value
     description: My Cron Job
     regoin: us-east-1
     memory: 128
