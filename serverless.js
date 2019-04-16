@@ -97,7 +97,11 @@ class Cron extends Component {
     this.state.name = inputs.name
     await this.save()
 
-    return { ...lambdaOutput, rate: inputs.rate || '1m', enabled: inputs.enabled }
+    const outputs = { ...lambdaOutput, rate: inputs.rate || '1m', enabled: inputs.enabled }
+
+    this.cli.outputs(outputs)
+
+    return outputs
   }
 
   async remove() {
