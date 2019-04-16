@@ -65,7 +65,7 @@ stage: dev
 Cron:
   component: "@serverless/cron"
   inputs:
-    name: cron-job
+    name: cron-job # auto generated if not provided
     
     # you can provide a rate either as rate with
     # this format <amount><unit-character> (e.g. 1s, 5m, 2h)
