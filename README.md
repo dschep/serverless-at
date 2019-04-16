@@ -90,21 +90,32 @@ Cron:
 ### 4. Deploy
 
 ```console
-Socket (master)$ components
+cron (master)$ components
 
-  Socket › outputs:
-  url:  'wss://3v1fypmyz8.execute-api.us-east-1.amazonaws.com/dev/'
-  code: 
-    runtime:  'nodejs8.10'
-    env:  []
-    timeout:  10
-    memory:  512
-  routes:  [ '$connect', '$disconnect', '$default' ]
+  Cron › outputs:
+  name:  'cron-job'
+  description:  'My Cron Job'
+  memory:  128
+  timeout:  10
+  bucket:  undefined
+  shims:  []
+  handler:  'cron.handler'
+  runtime:  'nodejs8.10'
+  env: 
+    TABLE_NAME:  'my-table'
+  role: 
+    name:  'cron-job'
+    arn:  'arn:aws:iam::552760238299:role/cron-job'
+    service:  'lambda.amazonaws.com'
+    policy:  { arn: 'arn:aws:iam::aws:policy/AdministratorAccess' }
+  arn:  'arn:aws:lambda:us-east-1:552760238299:function:cron-job'
+  rate:  '2m'
+  enabled:  true
 
 
-  36s › dev › Socket › done
+  50s › dev › cron-job › done
 
-Socket (master)$
+cron (master)$
 ```
 
 &nbsp;
