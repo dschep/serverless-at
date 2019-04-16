@@ -74,7 +74,7 @@ Cron:
     enabled: true # this is the default value
     handler: cron.handler # this is the default value
     description: My Cron Job
-    regoin: us-east-1
+    region: us-east-1
     memory: 128
     timeout: 10
     env:
