@@ -2,7 +2,7 @@
 
 &nbsp;
 
-Instantly run scheduled cron jobs on AWS using [Serverless Components](https://github.com/serverless/components).
+Instantly run scheduled cron jobs on AWS Lambda using [Serverless Components](https://github.com/serverless/components).
 
 &nbsp;
 
