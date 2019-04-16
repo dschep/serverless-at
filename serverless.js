@@ -46,15 +46,16 @@ class Cron extends Component {
     inputs.handler = inputs.handler || 'cron.handler'
     inputs.parsedRate = parseRate(inputs.rate || '1m')
     inputs.enabled = inputs.enabled || true
+    inputs.region = inputs.region || 'us-east-1'
 
     const lambdaOutput = await awsLambda(inputs)
 
     const lambda = new AWS.Lambda({
-      region: 'us-east-1',
+      region: inputs.region,
       credentials: this.context.credentials.aws
     })
     const cloudWatchEvents = new AWS.CloudWatchEvents({
-      region: 'us-east-1',
+      region: inputs.region,
       credentials: this.context.credentials.aws
     })
 
@@ -105,7 +106,7 @@ class Cron extends Component {
   }
 
   async remove() {
-    this.cli.status('Deploying')
+    this.cli.status('Removing')
     const awsLambda = await this.load('@serverless/aws-lambda')
 
     await awsLambda.remove()
