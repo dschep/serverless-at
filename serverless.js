@@ -96,6 +96,7 @@ class Schedule extends Component {
     }
 
     this.state.name = inputs.name
+    this.state.region = inputs.region
     await this.save()
 
     const outputs = { ...lambdaOutput, rate: inputs.rate || '1m', enabled: inputs.enabled }
@@ -110,7 +111,10 @@ class Schedule extends Component {
     if (!this.state.name) {
       return
     }
-    const cloudWatchEvents = new AWS.CloudWatchEvents()
+    const cloudWatchEvents = new AWS.CloudWatchEvents({
+      region: this.state.region,
+      credentials: this.context.credentials.aws
+    })
 
     const removeTargetsParams = {
       Rule: this.state.name,
