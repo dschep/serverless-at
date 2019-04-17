@@ -32,7 +32,7 @@ const parseRate = (rate = '1m') => {
   return `cron(${rate})`
 }
 
-class Cron extends Component {
+class Schedule extends Component {
   async default(inputs = {}) {
     this.cli.status('Deploying')
     const awsLambda = await this.load('@serverless/aws-lambda')
@@ -40,10 +40,10 @@ class Cron extends Component {
     inputs.name =
       inputs.name ||
       this.state.name ||
-      `cron-${Math.random()
+      `schedule-${Math.random()
         .toString(36)
         .substring(6)}`
-    inputs.handler = inputs.handler || 'cron.handler'
+    inputs.handler = inputs.handler || 'schedule.handler'
     inputs.parsedRate = parseRate(inputs.rate || '1m')
     inputs.enabled = inputs.enabled || true
     inputs.region = inputs.region || 'us-east-1'
@@ -82,7 +82,7 @@ class Cron extends Component {
     const addPermissionParams = {
       Action: 'lambda:InvokeFunction',
       FunctionName: inputs.name,
-      StatementId: `cron-${inputs.name}`,
+      StatementId: `schedule-${inputs.name}`,
       Principal: 'events.amazonaws.com'
     }
 
@@ -107,6 +107,36 @@ class Cron extends Component {
 
   async remove() {
     this.cli.status('Removing')
+    if (!this.state.name) {
+      return
+    }
+    const cloudWatchEvents = new AWS.CloudWatchEvents()
+
+    const removeTargetsParams = {
+      Rule: this.state.name,
+      Ids: [this.state.name]
+    }
+
+    try {
+      await cloudWatchEvents.removeTargets(removeTargetsParams).promise()
+    } catch (error) {
+      if (error.code !== 'ResourceNotFoundException') {
+        throw error
+      }
+    }
+
+    const deleteRuleParams = {
+      Name: this.state.name
+    }
+
+    try {
+      await cloudWatchEvents.deleteRule(deleteRuleParams).promise()
+    } catch (error) {
+      if (error.code !== 'InternalException') {
+        throw error
+      }
+    }
+
     const awsLambda = await this.load('@serverless/aws-lambda')
 
     await awsLambda.remove()
@@ -117,4 +147,4 @@ class Cron extends Component {
   }
 }
 
-module.exports = Cron
+module.exports = Schedule
