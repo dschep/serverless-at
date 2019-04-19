@@ -1,6 +1,6 @@
 ![serverless scheduled task aws lambda](https://s3.amazonaws.com/assets.github.serverless/readme-serverless-schedule.png)
 
-# Schedule
+# schedule
 
 &nbsp;
 
@@ -64,7 +64,7 @@ All the following inputs are optional. However, they allow you to configure your
 name: schedule
 stage: dev
 
-Schedule:
+mySchedule:
   component: "@serverless/schedule"
   inputs:
     name: schedule # auto generated if not provided
