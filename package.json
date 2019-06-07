@@ -1,6 +1,6 @@
 {
   "name": "@serverless/schedule",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "main": "./serverless.js",
   "publishConfig": {
     "access": "public"
@@ -12,8 +12,8 @@
   "author": "Serverless, Inc.",
   "license": "Apache",
   "dependencies": {
-    "@serverless/aws-lambda": "^0.1.0",
-    "@serverless/components": "^0.1.0",
+    "@serverless/aws-lambda": "^0.2.0",
+    "@serverless/components": "^0.2.0",
     "aws-sdk": "^2.436.0"
   },
   "devDependencies": {

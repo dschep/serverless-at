@@ -34,7 +34,7 @@ const parseRate = (rate = '1m') => {
 
 class Schedule extends Component {
   async default(inputs = {}) {
-    this.cli.status('Deploying')
+    this.ui.status('Deploying')
     const awsLambda = await this.load('@serverless/aws-lambda')
 
     inputs.name =
@@ -101,13 +101,17 @@ class Schedule extends Component {
 
     const outputs = { ...lambdaOutput, rate: inputs.rate || '1m', enabled: inputs.enabled }
 
-    this.cli.outputs(outputs)
+    this.ui.outputs(outputs)
+
+    this.ui.log()
+    this.ui.output('rate', `   ${outputs.rate}`)
+    this.ui.output('enabled', `${outputs.enabled}`)
 
     return outputs
   }
 
   async remove() {
-    this.cli.status('Removing')
+    this.ui.status('Removing')
     if (!this.state.name) {
       return
     }
