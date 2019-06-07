@@ -101,8 +101,6 @@ class Schedule extends Component {
 
     const outputs = { ...lambdaOutput, rate: inputs.rate || '1m', enabled: inputs.enabled }
 
-    this.ui.outputs(outputs)
-
     this.ui.log()
     this.ui.output('rate', `   ${outputs.rate}`)
     this.ui.output('enabled', `${outputs.enabled}`)
