@@ -1,4 +1,5 @@
-const { Component } = require('@serverless/components')
+const path = require('path')
+const { Component, utils } = require('@serverless/core')
 const AWS = require('aws-sdk')
 
 const parseRate = (rate = '1m') => {
@@ -34,19 +35,17 @@ const parseRate = (rate = '1m') => {
 
 class Schedule extends Component {
   async default(inputs = {}) {
-    this.ui.status('Deploying')
+    this.context.status('Deploying')
     const awsLambda = await this.load('@serverless/aws-lambda')
 
     inputs.name =
-      inputs.name ||
       this.state.name ||
-      `schedule-${Math.random()
-        .toString(36)
-        .substring(6)}`
+      utils.generateResourceName(inputs.name || 'schedule', this.context.resourceGroupId)
     inputs.handler = inputs.handler || 'schedule.handler'
     inputs.parsedRate = parseRate(inputs.rate || '1m')
     inputs.enabled = inputs.enabled || true
     inputs.region = inputs.region || 'us-east-1'
+    inputs.code = path.join(process.cwd(), 'test')
 
     const lambdaOutput = await awsLambda(inputs)
 
@@ -101,15 +100,15 @@ class Schedule extends Component {
 
     const outputs = { ...lambdaOutput, rate: inputs.rate || '1m', enabled: inputs.enabled }
 
-    this.ui.log()
-    this.ui.output('rate', `   ${outputs.rate}`)
-    this.ui.output('enabled', `${outputs.enabled}`)
+    this.context.log()
+    this.context.output('rate', `   ${outputs.rate}`)
+    this.context.output('enabled', `${outputs.enabled}`)
 
     return outputs
   }
 
   async remove() {
-    this.ui.status('Removing')
+    this.context.status('Removing')
     if (!this.state.name) {
       return
     }
