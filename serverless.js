@@ -1,6 +1,12 @@
 const path = require('path')
+const types = require('./serverless.types.js')
 const { Component, utils } = require('@serverless/core')
 const AWS = require('aws-sdk')
+
+/**
+ * Parse Rate
+ * - Takes a simple string and parses it as a standard cron expression
+ */
 
 const parseRate = (rate = '1m') => {
   const unit = rate.substr(rate.length - 1)
@@ -33,58 +39,74 @@ const parseRate = (rate = '1m') => {
   return `cron(${rate})`
 }
 
-class Schedule extends Component {
-  async default(inputs = {}) {
-    this.context.status('Deploying')
-    const awsLambda = await this.load('@serverless/aws-lambda')
+/**
+ * Schedule
+ */
 
-    inputs.name =
-      this.state.name ||
-      utils.generateResourceName(inputs.name || 'schedule', this.context.resourceGroupId)
+class Schedule extends Component {
+
+  /**
+   * Types
+   */
+
+  types() { return types }
+
+  /**
+   * Default
+   */
+
+  async default(inputs = {}) {
+
+    this.context.status('Deploying')
+
     inputs.handler = inputs.handler || 'schedule.handler'
-    inputs.parsedRate = parseRate(inputs.rate || '1m')
+    inputs.parsedRate = parseRate(inputs.rate || '1h')
     inputs.enabled = inputs.enabled || true
     inputs.region = inputs.region || 'us-east-1'
-    inputs.code = path.join(process.cwd(), 'test')
+    inputs.timeout = inputs.timeout || 7
+    inputs.memory = inputs.memory || 512
+    inputs.code = inputs.code
+    inputs.env = inputs.env || {}
 
-    const lambdaOutput = await awsLambda(inputs)
+    this.state.cwName = this.state.cwName || 'scheduled-task-' + this.context.resourceId()
+    await this.save()
+
+    this.context.status('Deploying AWS Lambda')
+    const awsLambda = await this.load('@serverless/aws-lambda')
+    const lambdaOutputs = await awsLambda(inputs)
+
+    const cloudWatchEvents = new AWS.CloudWatchEvents({
+      region: inputs.region,
+      credentials: this.context.credentials.aws
+    })
+    const putRuleParams = {
+      Name: this.state.cwName,
+      ScheduleExpression: inputs.parsedRate,
+      State: inputs.enabled ? 'ENABLED' : 'DISABLED'
+    }
+    await cloudWatchEvents.putRule(putRuleParams).promise()
+
+    const putTargetsParams = {
+      Rule: this.state.cwName,
+      Targets: [
+        {
+          Arn: lambdaOutputs.arn,
+          Id: this.state.cwName
+        }
+      ]
+    }
+    await cloudWatchEvents.putTargets(putTargetsParams).promise()
 
     const lambda = new AWS.Lambda({
       region: inputs.region,
       credentials: this.context.credentials.aws
     })
-    const cloudWatchEvents = new AWS.CloudWatchEvents({
-      region: inputs.region,
-      credentials: this.context.credentials.aws
-    })
-
-    const putRuleParams = {
-      Name: inputs.name,
-      ScheduleExpression: inputs.parsedRate,
-      State: inputs.enabled ? 'ENABLED' : 'DISABLED'
-    }
-
-    await cloudWatchEvents.putRule(putRuleParams).promise()
-
-    const putTargetsParams = {
-      Rule: inputs.name,
-      Targets: [
-        {
-          Arn: lambdaOutput.arn,
-          Id: inputs.name
-        }
-      ]
-    }
-
-    await cloudWatchEvents.putTargets(putTargetsParams).promise()
-
     const addPermissionParams = {
       Action: 'lambda:InvokeFunction',
-      FunctionName: inputs.name,
-      StatementId: `schedule-${inputs.name}`,
+      FunctionName: lambdaOutputs.name,
+      StatementId: this.state.cwName,
       Principal: 'events.amazonaws.com'
     }
-
     try {
       await lambda.addPermission(addPermissionParams).promise()
     } catch (e) {
@@ -94,11 +116,10 @@ class Schedule extends Component {
       }
     }
 
-    this.state.name = inputs.name
     this.state.region = inputs.region
     await this.save()
 
-    const outputs = { ...lambdaOutput, rate: inputs.rate || '1m', enabled: inputs.enabled }
+    const outputs = { ...lambdaOutputs, rate: inputs.rate || '1m', enabled: inputs.enabled }
 
     this.context.log()
     this.context.output('rate', `   ${outputs.rate}`)
@@ -107,19 +128,21 @@ class Schedule extends Component {
     return outputs
   }
 
+  /**
+   * Remove
+   */
+
   async remove() {
     this.context.status('Removing')
-    if (!this.state.name) {
-      return
-    }
+
     const cloudWatchEvents = new AWS.CloudWatchEvents({
       region: this.state.region,
       credentials: this.context.credentials.aws
     })
 
     const removeTargetsParams = {
-      Rule: this.state.name,
-      Ids: [this.state.name]
+      Rule: this.state.cwName,
+      Ids: [this.state.cwName]
     }
 
     try {
@@ -131,7 +154,7 @@ class Schedule extends Component {
     }
 
     const deleteRuleParams = {
-      Name: this.state.name
+      Name: this.state.cwName
     }
 
     try {
@@ -143,7 +166,6 @@ class Schedule extends Component {
     }
 
     const awsLambda = await this.load('@serverless/aws-lambda')
-
     await awsLambda.remove()
 
     this.state = {}
