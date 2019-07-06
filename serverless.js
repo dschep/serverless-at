@@ -59,6 +59,8 @@ class Schedule extends Component {
 
     this.context.status('Deploying')
 
+    if (!inputs.code) throw new Error('"code" is a required input')
+
     inputs.handler = inputs.handler || 'schedule.handler'
     inputs.parsedRate = parseRate(inputs.rate || '1h')
     inputs.enabled = inputs.enabled || true
