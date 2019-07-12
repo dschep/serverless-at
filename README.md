@@ -46,10 +46,10 @@ AWS_ACCESS_KEY_ID=XXX
 AWS_SECRET_ACCESS_KEY=XXX
 ```
 
-The `schedule.js` file contains your scheduling code.
+The `schedule.js` file should contain your scheduling code.  It must export a module named `task`:
 
 ```js
-module.exports.handler = async (e, ctx, cb) => {
+module.exports.task = async (e, ctx, cb) => {
   console.log('running in schedule')
 }
 ```
@@ -67,26 +67,20 @@ stage: dev
 mySchedule:
   component: "@serverless/schedule"
   inputs:
-    name: schedule # auto generated if not provided
-    
+    code:
+      src: ./code # The root folder containing the schedule.js file
+      build: build # The folder within your 'src' directory containing your built artifacts
+      hook: npm run build # A hook to build/test/do anything
     # you can provide a rate either as rate with
     # this format <amount><unit-character> (e.g. 1s, 5m, 2h)
     # or a cron expresion  
-    rate: 5m 
+    rate: 5m
     enabled: true # this is the default value
-    handler: schedule.handler # this is the default value
-    description: My Schedule
     region: us-east-1
     memory: 128
     timeout: 10
     env:
       TABLE_NAME: my-table
-    
-    # the directory that contains the schedule.js file.
-    # If not provided, the default is the current working directory
-    code: ./code
-
-
 ```
 
 ### 4. Deploy
@@ -103,9 +97,9 @@ schedule (master)$ components
   shims:  []
   handler:  'schedule.handler'
   runtime:  'nodejs8.10'
-  env: 
+  env:
     TABLE_NAME:  'my-table'
-  role: 
+  role:
     name:  'schedule'
     arn:  'arn:aws:iam::552760238299:role/schedule'
     service:  'lambda.amazonaws.com'
