@@ -95,6 +95,7 @@ class Schedule extends Component {
       region: inputs.region,
       credentials: this.context.credentials.aws
     })
+
     const putRuleParams = {
       Name: this.state.cwName,
       ScheduleExpression: inputs.parsedRate,

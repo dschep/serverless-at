@@ -18,6 +18,7 @@ const types = {
           name: 'rate',
           description: 'The rate at which the scheduled task runs.  Format: 1s, 1m, 1d, 2s, 2m, 2d',
           type: 'value',
+          valueType: 'string',
           required: true,
           default: '1h',
         },
@@ -25,16 +26,14 @@ const types = {
           name: 'enabled',
           description: 'Whether the scheduled task is enabled or not.',
           type: 'value',
+          valueType: 'boolean',
           required: true,
-          default: 'true',
-          options: [
-            'true',
-            'false',
-          ]
+          default: true
         },
         {
           name: 'region',
           type: 'value',
+          valueType: 'string',
           required: true,
           description: 'The AWS region this should be located in',
           default: 'us-east-1',
@@ -64,15 +63,14 @@ const types = {
         },
         {
           name: 'env',
-          type: 'key_value',
+          type: 'key_values',
           description: 'Variables you wish to be automatically bundled into your code',
-          required: false,
-          references: true,
-          multiple: true,
+          required: false
         },
         {
           name: 'memory',
           type: 'value',
+          valueType: 'number',
           description: 'The memory size of the AWS Lambda function running the back-end code.  Increased memory size will result in faster performance, reduced cold-start times, but also higher cost',
           required: true,
           default: 896,
@@ -90,6 +88,7 @@ const types = {
         {
           name: 'timeout',
           type: 'value',
+          valueType: 'number',
           description: 'The number of seconds which the AWS Lambda function running the back-end code can run for',
           required: true,
           default: 9,
