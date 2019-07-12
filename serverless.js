@@ -1,5 +1,12 @@
-const { Component } = require('@serverless/core')
+const path = require('path')
+const types = require('./serverless.types.js')
+const { Component, utils } = require('@serverless/core')
 const AWS = require('aws-sdk')
+
+/**
+ * Parse Rate
+ * - Takes a simple string and parses it as a standard cron expression
+ */
 
 const parseRate = (rate = '1m') => {
   const unit = rate.substr(rate.length - 1)
@@ -32,28 +39,70 @@ const parseRate = (rate = '1m') => {
   return `cron(${rate})`
 }
 
+/**
+ * Schedule
+ */
+
 class Schedule extends Component {
+  /**
+   * Types
+   */
+
+  types() {
+    return types
+  }
+
+  /**
+   * Default
+   */
+
   async default(inputs = {}) {
     this.context.status('Deploying')
-    const awsLambda = await this.load('@serverless/aws-lambda')
 
     inputs.name = this.state.name || this.context.resourceId()
-    inputs.handler = inputs.handler || 'schedule.handler'
-    inputs.parsedRate = parseRate(inputs.rate || '1m')
-    inputs.enabled = inputs.enabled || true
     inputs.region = inputs.region || 'us-east-1'
-    inputs.code = inputs.code || process.cwd()
+
+    inputs.code = inputs.code || {}
+    inputs.code.src = inputs.code.src ? path.resolve(inputs.code.src) : process.cwd()
+    if (inputs.code.build) {
+      inputs.code.build = path.join(inputs.code.src, inputs.code.build)
+    }
+
+    let exists
+    if (inputs.code.build) {
+      exists = await utils.fileExists(path.join(inputs.code.build, 'index.js'))
+    } else {
+      exists = await utils.fileExists(path.join(inputs.code.src, 'index.js'))
+    }
+
+    if (!exists) {
+      throw Error(
+        `No index.js file found in the directory "${inputs.code.build || inputs.code.src}"`
+      )
+    }
+
+    if (typeof inputs.enabled === 'undefined') {
+      inputs.enabled = true
+    }
+
+    inputs.parsedRate = parseRate(inputs.rate || '1h')
 
     this.context.debug(
       `Deploying a schedule of ${inputs.parsedRate} in the ${inputs.region} region.`
     )
 
-    const lambdaOutputs = await awsLambda(inputs)
+    this.context.status('Deploying AWS Lambda')
+    const lambdaInputs = {}
+    lambdaInputs.handler = 'index.task'
+    lambdaInputs.region = inputs.region
+    lambdaInputs.timeout = inputs.timeout || 7
+    lambdaInputs.memory = inputs.memory || 512
+    lambdaInputs.code = inputs.code.build || inputs.code.src
+    lambdaInputs.env = inputs.env || {}
+    lambdaInputs.description = 'A function for the Schedule Component.'
+    const awsLambda = await this.load('@serverless/aws-lambda')
+    const lambdaOutputs = await awsLambda(lambdaInputs)
 
-    const lambda = new AWS.Lambda({
-      region: inputs.region,
-      credentials: this.context.credentials.aws
-    })
     const cloudWatchEvents = new AWS.CloudWatchEvents({
       region: inputs.region,
       credentials: this.context.credentials.aws
@@ -87,13 +136,16 @@ class Schedule extends Component {
 
     await cloudWatchEvents.putTargets(putTargetsParams).promise()
 
+    const lambda = new AWS.Lambda({
+      region: inputs.region,
+      credentials: this.context.credentials.aws
+    })
     const addPermissionParams = {
       Action: 'lambda:InvokeFunction',
       FunctionName: lambdaOutputs.name,
       StatementId: inputs.name,
       Principal: 'events.amazonaws.com'
     }
-
     try {
       await lambda.addPermission(addPermissionParams).promise()
 
@@ -117,6 +169,10 @@ class Schedule extends Component {
 
     return outputs
   }
+
+  /**
+   * Remove
+   */
 
   async remove() {
     this.context.status('Removing')
@@ -157,7 +213,6 @@ class Schedule extends Component {
     }
 
     const awsLambda = await this.load('@serverless/aws-lambda')
-
     await awsLambda.remove()
 
     this.context.debug(
