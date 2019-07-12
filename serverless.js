@@ -1,5 +1,4 @@
-const path = require('path')
-const { Component, utils } = require('@serverless/core')
+const { Component } = require('@serverless/core')
 const AWS = require('aws-sdk')
 
 const parseRate = (rate = '1m') => {
@@ -38,16 +37,18 @@ class Schedule extends Component {
     this.context.status('Deploying')
     const awsLambda = await this.load('@serverless/aws-lambda')
 
-    inputs.name =
-      this.state.name ||
-      utils.generateResourceName(inputs.name || 'schedule', this.context.resourceGroupId)
+    inputs.name = this.state.name || this.context.resourceId()
     inputs.handler = inputs.handler || 'schedule.handler'
     inputs.parsedRate = parseRate(inputs.rate || '1m')
     inputs.enabled = inputs.enabled || true
     inputs.region = inputs.region || 'us-east-1'
-    inputs.code = path.join(process.cwd(), 'test')
+    inputs.code = inputs.code || process.cwd()
 
-    const lambdaOutput = await awsLambda(inputs)
+    this.context.debug(
+      `Deploying a schedule of ${inputs.parsedRate} in the ${inputs.region} region.`
+    )
+
+    const lambdaOutputs = await awsLambda(inputs)
 
     const lambda = new AWS.Lambda({
       region: inputs.region,
@@ -58,11 +59,17 @@ class Schedule extends Component {
       credentials: this.context.credentials.aws
     })
 
+    const scheduleStatus = inputs.enabled ? 'ENABLED' : 'DISABLED'
+
     const putRuleParams = {
       Name: inputs.name,
       ScheduleExpression: inputs.parsedRate,
-      State: inputs.enabled ? 'ENABLED' : 'DISABLED'
+      State: scheduleStatus
     }
+
+    this.context.debug(
+      `Deploying CloudWatch rule named ${inputs.name} with status of ${scheduleStatus}.`
+    )
 
     await cloudWatchEvents.putRule(putRuleParams).promise()
 
@@ -70,23 +77,31 @@ class Schedule extends Component {
       Rule: inputs.name,
       Targets: [
         {
-          Arn: lambdaOutput.arn,
+          Arn: lambdaOutputs.arn,
           Id: inputs.name
         }
       ]
     }
 
+    this.context.debug(`Adding lambda ${lambdaOutputs.name} as target for rule ${inputs.name}.`)
+
     await cloudWatchEvents.putTargets(putTargetsParams).promise()
 
     const addPermissionParams = {
       Action: 'lambda:InvokeFunction',
-      FunctionName: inputs.name,
-      StatementId: `schedule-${inputs.name}`,
+      FunctionName: lambdaOutputs.name,
+      StatementId: inputs.name,
       Principal: 'events.amazonaws.com'
     }
 
     try {
       await lambda.addPermission(addPermissionParams).promise()
+
+      this.context.debug(
+        `Schedule ${inputs.name} has been ${scheduleStatus.toLowerCase()} for function ${
+          lambdaOutputs.name
+        }.`
+      )
     } catch (e) {
       // if we are making an update, permissions are already added...
       if (e.code !== 'ResourceConflictException') {
@@ -98,11 +113,7 @@ class Schedule extends Component {
     this.state.region = inputs.region
     await this.save()
 
-    const outputs = { ...lambdaOutput, rate: inputs.rate || '1m', enabled: inputs.enabled }
-
-    this.context.log()
-    this.context.output('rate', `   ${outputs.rate}`)
-    this.context.output('enabled', `${outputs.enabled}`)
+    const outputs = { ...lambdaOutputs, rate: inputs.rate || '1m', enabled: inputs.enabled }
 
     return outputs
   }
@@ -110,6 +121,7 @@ class Schedule extends Component {
   async remove() {
     this.context.status('Removing')
     if (!this.state.name) {
+      this.context.debug(`Aborting CloudWatch rule removal. Name not found in state.`)
       return
     }
     const cloudWatchEvents = new AWS.CloudWatchEvents({
@@ -123,6 +135,7 @@ class Schedule extends Component {
     }
 
     try {
+      this.context.debug(`Removing CloudWatch targets for rule ${this.state.name}.`)
       await cloudWatchEvents.removeTargets(removeTargetsParams).promise()
     } catch (error) {
       if (error.code !== 'ResourceNotFoundException') {
@@ -135,6 +148,7 @@ class Schedule extends Component {
     }
 
     try {
+      this.context.debug(`Removing rule ${this.state.name} from the ${this.state.region} region.`)
       await cloudWatchEvents.deleteRule(deleteRuleParams).promise()
     } catch (error) {
       if (error.code !== 'InternalException') {
@@ -145,6 +159,10 @@ class Schedule extends Component {
     const awsLambda = await this.load('@serverless/aws-lambda')
 
     await awsLambda.remove()
+
+    this.context.debug(
+      `Schedule ${this.state.name} was successfully removed from the ${this.state.region} region.`
+    )
 
     this.state = {}
     await this.save()
