@@ -59,23 +59,37 @@ class Schedule extends Component {
 
     this.context.status('Deploying')
 
-    if (!inputs.code) throw new Error('"code" is a required input')
+    // Default to current working directory
+    inputs.code = inputs.code || {}
+    inputs.code.src = inputs.code.src ? path.resolve(inputs.code.src) : process.cwd()
+    if (inputs.code.build) inputs.code.build = path.join(inputs.code.src, inputs.code.build)
 
-    inputs.handler = inputs.handler || 'schedule.handler'
+    let exists
+    if (inputs.code.build) exists = await utils.fileExists(path.join(inputs.code.build, 'index.js'))
+    else exists = await utils.fileExists(path.join(inputs.code.src, 'index.js'))
+
+    if (!exists) {
+      throw Error(`No index.js file found in the directory "${inputs.code.build || inputs.code.src}"`)
+    }
+
+    if (typeof inputs.enabled === 'undefined') inputs.enabled = true
+
     inputs.parsedRate = parseRate(inputs.rate || '1h')
-    inputs.enabled = inputs.enabled || true
-    inputs.region = inputs.region || 'us-east-1'
-    inputs.timeout = inputs.timeout || 7
-    inputs.memory = inputs.memory || 512
-    inputs.code = inputs.code
-    inputs.env = inputs.env || {}
 
     this.state.cwName = this.state.cwName || 'scheduled-task-' + this.context.resourceId()
     await this.save()
 
     this.context.status('Deploying AWS Lambda')
+    const lambdaInputs = {}
+    lambdaInputs.handler = 'index.task'
+    lambdaInputs.region = inputs.region || 'us-east-1'
+    lambdaInputs.timeout = inputs.timeout || 7
+    lambdaInputs.memory = inputs.memory || 512
+    lambdaInputs.code = inputs.code.build || inputs.code.src
+    lambdaInputs.env = inputs.env || {}
+    lambdaInputs.description = 'A function for the Schedule Component.'
     const awsLambda = await this.load('@serverless/aws-lambda')
-    const lambdaOutputs = await awsLambda(inputs)
+    const lambdaOutputs = await awsLambda(lambdaInputs)
 
     const cloudWatchEvents = new AWS.CloudWatchEvents({
       region: inputs.region,
@@ -124,7 +138,7 @@ class Schedule extends Component {
     const outputs = { ...lambdaOutputs, rate: inputs.rate || '1m', enabled: inputs.enabled }
 
     this.context.log()
-    this.context.output('rate', `   ${outputs.rate}`)
+    this.context.output('rate', `${outputs.rate}`)
     this.context.output('enabled', `${outputs.enabled}`)
 
     return outputs
