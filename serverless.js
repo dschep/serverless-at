@@ -61,15 +61,15 @@ class Schedule extends Component {
 
     // Default to current working directory
     inputs.code = inputs.code || {}
-    inputs.code.src = inputs.code.src ? path.resolve(inputs.code.src) : process.cwd()
-    if (inputs.code.build) inputs.code.build = path.join(inputs.code.src, inputs.code.build)
+    inputs.code.root = inputs.code.root ? path.resolve(inputs.code.root) : process.cwd()
+    if (inputs.code.src) inputs.code.src = path.join(inputs.code.root, inputs.code.src)
 
     let exists
-    if (inputs.code.build) exists = await utils.fileExists(path.join(inputs.code.build, 'index.js'))
-    else exists = await utils.fileExists(path.join(inputs.code.src, 'index.js'))
+    if (inputs.code.src) exists = await utils.fileExists(path.join(inputs.code.src, 'index.js'))
+    else exists = await utils.fileExists(path.join(inputs.code.root, 'index.js'))
 
     if (!exists) {
-      throw Error(`No index.js file found in the directory "${inputs.code.build || inputs.code.src}"`)
+      throw Error(`No index.js file found in the directory "${inputs.code.src || inputs.code.root}"`)
     }
 
     if (typeof inputs.enabled === 'undefined') inputs.enabled = true
@@ -85,7 +85,7 @@ class Schedule extends Component {
     lambdaInputs.region = inputs.region || 'us-east-1'
     lambdaInputs.timeout = inputs.timeout || 7
     lambdaInputs.memory = inputs.memory || 512
-    lambdaInputs.code = inputs.code.build || inputs.code.src
+    lambdaInputs.code = inputs.code.src || inputs.code.root
     lambdaInputs.env = inputs.env || {}
     lambdaInputs.description = 'A function for the Schedule Component.'
     const awsLambda = await this.load('@serverless/aws-lambda')
