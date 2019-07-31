@@ -44,22 +44,24 @@ const parseRate = (rate = '1m') => {
  */
 
 class Schedule extends Component {
-
   /**
    * Types
    */
 
-  types() { return types }
+  types() {
+    return types
+  }
 
   /**
    * Default
    */
 
   async default(inputs = {}) {
-
     this.context.status('Deploying')
 
-    // Default to current working directory
+    inputs.name = this.state.name || this.context.resourceId()
+    inputs.region = inputs.region || 'us-east-1'
+
     inputs.code = inputs.code || {}
     inputs.code.root = inputs.code.root ? path.resolve(inputs.code.root) : process.cwd()
     if (inputs.code.src) inputs.code.src = path.join(inputs.code.root, inputs.code.src)
@@ -69,20 +71,25 @@ class Schedule extends Component {
     else exists = await utils.fileExists(path.join(inputs.code.root, 'index.js'))
 
     if (!exists) {
-      throw Error(`No index.js file found in the directory "${inputs.code.src || inputs.code.root}"`)
+      throw Error(
+        `No index.js file found in the directory "${inputs.code.src || inputs.code.root}"`
+      )
     }
 
-    if (typeof inputs.enabled === 'undefined') inputs.enabled = true
+    if (typeof inputs.enabled === 'undefined') {
+      inputs.enabled = true
+    }
 
     inputs.parsedRate = parseRate(inputs.rate || '1h')
 
-    this.state.cwName = this.state.cwName || 'scheduled-task-' + this.context.resourceId()
-    await this.save()
+    this.context.debug(
+      `Deploying a schedule of ${inputs.parsedRate} in the ${inputs.region} region.`
+    )
 
     this.context.status('Deploying AWS Lambda')
     const lambdaInputs = {}
     lambdaInputs.handler = 'index.task'
-    lambdaInputs.region = inputs.region || 'us-east-1'
+    lambdaInputs.region = inputs.region
     lambdaInputs.timeout = inputs.timeout || 7
     lambdaInputs.memory = inputs.memory || 512
     lambdaInputs.code = inputs.code.src || inputs.code.root
@@ -96,22 +103,32 @@ class Schedule extends Component {
       credentials: this.context.credentials.aws
     })
 
+    const scheduleStatus = inputs.enabled ? 'ENABLED' : 'DISABLED'
+
     const putRuleParams = {
-      Name: this.state.cwName,
+      Name: inputs.name,
       ScheduleExpression: inputs.parsedRate,
-      State: inputs.enabled ? 'ENABLED' : 'DISABLED'
+      State: scheduleStatus
     }
+
+    this.context.debug(
+      `Deploying CloudWatch rule named ${inputs.name} with status of ${scheduleStatus}.`
+    )
+
     await cloudWatchEvents.putRule(putRuleParams).promise()
 
     const putTargetsParams = {
-      Rule: this.state.cwName,
+      Rule: inputs.name,
       Targets: [
         {
           Arn: lambdaOutputs.arn,
-          Id: this.state.cwName
+          Id: inputs.name
         }
       ]
     }
+
+    this.context.debug(`Adding lambda ${lambdaOutputs.name} as target for rule ${inputs.name}.`)
+
     await cloudWatchEvents.putTargets(putTargetsParams).promise()
 
     const lambda = new AWS.Lambda({
@@ -121,11 +138,17 @@ class Schedule extends Component {
     const addPermissionParams = {
       Action: 'lambda:InvokeFunction',
       FunctionName: lambdaOutputs.name,
-      StatementId: this.state.cwName,
+      StatementId: inputs.name,
       Principal: 'events.amazonaws.com'
     }
     try {
       await lambda.addPermission(addPermissionParams).promise()
+
+      this.context.debug(
+        `Schedule ${inputs.name} has been ${scheduleStatus.toLowerCase()} for function ${
+          lambdaOutputs.name
+        }.`
+      )
     } catch (e) {
       // if we are making an update, permissions are already added...
       if (e.code !== 'ResourceConflictException') {
@@ -133,14 +156,11 @@ class Schedule extends Component {
       }
     }
 
+    this.state.name = inputs.name
     this.state.region = inputs.region
     await this.save()
 
     const outputs = { ...lambdaOutputs, rate: inputs.rate || '1m', enabled: inputs.enabled }
-
-    this.context.log()
-    this.context.output('rate', `${outputs.rate}`)
-    this.context.output('enabled', `${outputs.enabled}`)
 
     return outputs
   }
@@ -151,18 +171,22 @@ class Schedule extends Component {
 
   async remove() {
     this.context.status('Removing')
-
+    if (!this.state.name) {
+      this.context.debug(`Aborting CloudWatch rule removal. Name not found in state.`)
+      return
+    }
     const cloudWatchEvents = new AWS.CloudWatchEvents({
       region: this.state.region,
       credentials: this.context.credentials.aws
     })
 
     const removeTargetsParams = {
-      Rule: this.state.cwName,
-      Ids: [this.state.cwName]
+      Rule: this.state.name,
+      Ids: [this.state.name]
     }
 
     try {
+      this.context.debug(`Removing CloudWatch targets for rule ${this.state.name}.`)
       await cloudWatchEvents.removeTargets(removeTargetsParams).promise()
     } catch (error) {
       if (error.code !== 'ResourceNotFoundException') {
@@ -171,10 +195,11 @@ class Schedule extends Component {
     }
 
     const deleteRuleParams = {
-      Name: this.state.cwName
+      Name: this.state.name
     }
 
     try {
+      this.context.debug(`Removing rule ${this.state.name} from the ${this.state.region} region.`)
       await cloudWatchEvents.deleteRule(deleteRuleParams).promise()
     } catch (error) {
       if (error.code !== 'InternalException') {
@@ -184,6 +209,10 @@ class Schedule extends Component {
 
     const awsLambda = await this.load('@serverless/aws-lambda')
     await awsLambda.remove()
+
+    this.context.debug(
+      `Schedule ${this.state.name} was successfully removed from the ${this.state.region} region.`
+    )
 
     this.state = {}
     await this.save()
