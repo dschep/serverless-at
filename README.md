@@ -19,7 +19,7 @@ Instantly run scheduled cron jobs on AWS Lambda using [Serverless Components](ht
 ### 1. Install
 
 ```console
-$ npm install -g @serverless/components
+$ npm install -g serverless
 ```
 
 ### 2. Create
@@ -35,8 +35,7 @@ The directory should look something like this:
 |- schedule.js
 |- serverless.yml
 |- package.json # optional
-|- .env         # your development AWS api keys
-|- .env.prod    # your production AWS api keys
+|- .env         # your AWS api keys
 ```
 
 the `.env` files are not required if you have the aws keys set globally and you want to use a single stage, but they should look like this.
@@ -71,6 +70,7 @@ mySchedule:
       src: ./code # The root folder containing the schedule.js file
       build: build # The folder within your 'src' directory containing your built artifacts
       hook: npm run build # A hook to build/test/do anything
+
     # you can provide a rate either as rate with
     # this format <amount><unit-character> (e.g. 1s, 5m, 2h)
     # or a cron expresion  
@@ -86,32 +86,7 @@ mySchedule:
 ### 4. Deploy
 
 ```console
-schedule (master)$ components
-
-  Schedule › outputs:
-  name:  'schedule'
-  description:  'My Schedule'
-  memory:  128
-  timeout:  10
-  bucket:  undefined
-  shims:  []
-  handler:  'schedule.handler'
-  runtime:  'nodejs8.10'
-  env:
-    TABLE_NAME:  'my-table'
-  role:
-    name:  'schedule'
-    arn:  'arn:aws:iam::552760238299:role/schedule'
-    service:  'lambda.amazonaws.com'
-    policy:  { arn: 'arn:aws:iam::aws:policy/AdministratorAccess' }
-  arn:  'arn:aws:lambda:us-east-1:552760238299:function:schedule'
-  rate:  '5m'
-  enabled:  true
-
-
-  50s › dev › schedule › done
-
-schedule (master)$
+$ serverless
 ```
 
 &nbsp;
