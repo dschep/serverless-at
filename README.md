@@ -68,6 +68,9 @@ mySchedule:
       build: build # The folder within your 'src' directory containing your built artifacts
       hook: npm run build # A hook to build/test/do anything
 
+    handler: foo.bar # optional - specifies handler file & function. eg: foo.js instead of index.js and bar instead of task
+    runtime: nodejs10.x # default
+
     # you can provide a rate either as rate with
     # this format <amount><unit-character> (e.g. 1s, 5m, 2h)
     # or a cron expresion  
