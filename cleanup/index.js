@@ -4,7 +4,8 @@ const AWS = require('aws-sdk')
 const lambda = new AWS.Lambda()
 const cloudWatchEvents = new AWS.CloudWatchEvents()
 
-module.exports.task = async () => {
+module.exports.task = async (event) => {
+  console.debug(event)
   const schedName = process.env.USER_CW_NAME
   const userSchedName = process.env.CLEANUP_CW_NAME
   const cleanupLambdaName = process.env.AWS_LAMBDA_FUNCTION_NAME
