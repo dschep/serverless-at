@@ -5,28 +5,17 @@ module.exports = {
       description: 'Deploys an instance of this component',
       inputs: [
         {
-          name: 'code',
-          type: 'code',
+          name: 'file',
+          type: 'file',
           required: true,
-          description: 'The directory which contains your task code, declared by an index.js file',
-          defaultRuntime: 'nodejs10.x',
-          runtimes: ['nodejs10.x', 'nodejs8.10']
+          description: 'The file containing a task handler'
         },
         {
-          name: 'rate',
-          description: 'The rate at which the scheduled task runs.  Format: 1s, 1m, 1d, 2s, 2m, 2d',
+          name: 'at',
+          description: 'The at which the scheduled task runs.  Format: ISO 8601 timestamp',
           type: 'value',
           valueType: 'string',
-          required: true,
-          default: '1h'
-        },
-        {
-          name: 'enabled',
-          description: 'Whether the scheduled task is enabled or not.',
-          type: 'value',
-          valueType: 'boolean',
-          required: true,
-          default: true
+          required: true
         },
         {
           name: 'region',

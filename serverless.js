@@ -1,43 +1,5 @@
-const path = require('path')
 const types = require('./serverless.types.js')
-const { Component, utils } = require('@serverless/core')
-const AWS = require('aws-sdk')
-
-/**
- * Parse Rate
- * - Takes a simple string and parses it as a standard cron expression
- */
-
-const parseRate = (rate = '1m') => {
-  const unit = rate.substr(rate.length - 1)
-  if (['m', 'h', 'd'].includes(unit)) {
-    let awsUnit
-    const period = rate.substr(0, rate.length - 1)
-    if (period === '1') {
-      if (unit === 'm') {
-        awsUnit = 'minute'
-      }
-      if (unit === 'h') {
-        awsUnit = 'hour'
-      }
-      if (unit === 'd') {
-        awsUnit = 'day'
-      }
-    } else {
-      if (unit === 'm') {
-        awsUnit = 'minutes'
-      }
-      if (unit === 'h') {
-        awsUnit = 'hours'
-      }
-      if (unit === 'd') {
-        awsUnit = 'days'
-      }
-    }
-    return `rate(${period} ${awsUnit})`
-  }
-  return `cron(${rate})`
-}
+const { Component } = require('@serverless/core')
 
 /**
  * Schedule
@@ -59,117 +21,70 @@ class Schedule extends Component {
   async default(inputs = {}) {
     this.context.status('Deploying')
 
-    inputs.name = this.state.name || this.context.resourceId()
+    inputs.name = this.state.name || inputs.name || this.context.resourceId()
     inputs.region = inputs.region || 'us-east-1'
+    inputs.timeout = inputs.timeout || 7
 
-    inputs.code = inputs.code || {}
-    inputs.code.root = inputs.code.root ? path.resolve(inputs.code.root) : process.cwd()
-    if (inputs.code.src) {
-      inputs.code.src = path.join(inputs.code.root, inputs.code.src)
+    const handlerBase = inputs.file.slice(0, inputs.file.lastIndexOf('.'))
+    const handlerExt = inputs.file.slice(inputs.file.lastIndexOf('.') + 1)
+    inputs.runtime = {
+      py: 'python3.7',
+      js: 'nodejs10.x'
+      // TODO: more runtimes
+    }[handlerExt]
+    inputs.handler = `${handlerBase}.task`
+
+    const date = new Date(inputs.at)
+    const userCronttab = `${date.getMinutes()} ${date.getHours()} ${date.getDate()} ${date.getMonth() +
+      1} ? ${date.getFullYear()}`
+    const cleanupDelay = Math.ceil(inputs.timeout / 60)
+    const cleanupDate = new Date(date.getTime() + cleanupDelay * 60000)
+    const cleanupCronttab = `${cleanupDate.getMinutes()} ${cleanupDate.getHours()} ${cleanupDate.getDate()} ${cleanupDate.getMonth() +
+      1} ? ${cleanupDate.getFullYear()}`
+
+    const userSchedule = await this.load('@serverless/schedule', 'UserSchedule')
+    const cleanupSchedule = await this.load('@serverless/schedule', 'CleanupSchedule')
+
+    this.context.status('Deploying your AWS Lambda')
+    const scheduleInputs = {}
+    scheduleInputs.name = `${inputs.name}-user`
+    scheduleInputs.rate = userCronttab
+    scheduleInputs.handler = inputs.handler
+    scheduleInputs.runtime = inputs.runtime
+    scheduleInputs.region = inputs.region
+    scheduleInputs.timeout = inputs.timeout
+    scheduleInputs.memory = inputs.memory || 512
+    scheduleInputs.code = { src: '.' }
+    scheduleInputs.env = inputs.env || {}
+    scheduleInputs.description = 'A function for the At Component.'
+    const scheduleOutputs = await userSchedule(scheduleInputs)
+
+    this.context.status('Deploying cleanup AWS Lambda')
+    const cleanupScheduleInputs = {}
+    cleanupScheduleInputs.name = `${inputs.name}-cleanup`
+    cleanupScheduleInputs.rate = cleanupCronttab
+    cleanupScheduleInputs.region = inputs.region
+    cleanupScheduleInputs.code = { src: 'cleanup', root: __dirname }
+    cleanupScheduleInputs.env = {
+      USER_LAMBDA_NAME: scheduleOutputs.name,
+      USER_CW_NAME: `${inputs.name}-user`,
+      CLEANUP_CW_NAME: `${inputs.name}-cleanup`
     }
-
-    let exists
-    // check for existence of file if user hasn't specified runtime & handler
-    if (!inputs.handler && !inputs.runtime) {
-      if (inputs.code.src) {
-        exists = await utils.fileExists(path.join(inputs.code.src, 'index.js'))
-      } else {
-        exists = await utils.fileExists(path.join(inputs.code.root, 'index.js'))
-      }
-
-      if (!exists) {
-        throw Error(
-          `No index.js file found in the directory "${inputs.code.src || inputs.code.root}"`
-        )
-      }
-    }
-
-    if (typeof inputs.enabled === 'undefined') {
-      inputs.enabled = true
-    }
-
-    inputs.parsedRate = parseRate(inputs.rate || '1h')
-
-    this.context.debug(
-      `Deploying a schedule of ${inputs.parsedRate} in the ${inputs.region} region.`
-    )
-
-    this.context.status('Deploying AWS Lambda')
-    const lambdaInputs = {}
-    lambdaInputs.handler = inputs.handler || 'index.task'
-    lambdaInputs.runtime = inputs.runtime || 'nodejs10.x'
-    lambdaInputs.region = inputs.region
-    lambdaInputs.timeout = inputs.timeout || 7
-    lambdaInputs.memory = inputs.memory || 512
-    lambdaInputs.code = inputs.code.src || inputs.code.root
-    lambdaInputs.env = inputs.env || {}
-    lambdaInputs.description = 'A function for the Schedule Component.'
-    const awsLambda = await this.load('@serverless/aws-lambda')
-    const lambdaOutputs = await awsLambda(lambdaInputs)
-
-    const cloudWatchEvents = new AWS.CloudWatchEvents({
-      region: inputs.region,
-      credentials: this.context.credentials.aws
-    })
-
-    const scheduleStatus = inputs.enabled ? 'ENABLED' : 'DISABLED'
-
-    const putRuleParams = {
-      Name: inputs.name,
-      ScheduleExpression: inputs.parsedRate,
-      State: scheduleStatus
-    }
-
-    this.context.debug(
-      `Deploying CloudWatch rule named ${inputs.name} with status of ${scheduleStatus}.`
-    )
-
-    await cloudWatchEvents.putRule(putRuleParams).promise()
-
-    const putTargetsParams = {
-      Rule: inputs.name,
-      Targets: [
-        {
-          Arn: lambdaOutputs.arn,
-          Id: inputs.name
-        }
-      ]
-    }
-
-    this.context.debug(`Adding lambda ${lambdaOutputs.name} as target for rule ${inputs.name}.`)
-
-    await cloudWatchEvents.putTargets(putTargetsParams).promise()
-
-    const lambda = new AWS.Lambda({
-      region: inputs.region,
-      credentials: this.context.credentials.aws
-    })
-    const addPermissionParams = {
-      Action: 'lambda:InvokeFunction',
-      FunctionName: lambdaOutputs.name,
-      StatementId: inputs.name,
-      Principal: 'events.amazonaws.com'
-    }
-    try {
-      await lambda.addPermission(addPermissionParams).promise()
-
-      this.context.debug(
-        `Schedule ${inputs.name} has been ${scheduleStatus.toLowerCase()} for function ${
-          lambdaOutputs.name
-        }.`
-      )
-    } catch (e) {
-      // if we are making an update, permissions are already added...
-      if (e.code !== 'ResourceConflictException') {
-        throw e
-      }
-    }
+    cleanupScheduleInputs.description = 'A cleanup function for the At Component.'
+    const cleanupScheduleOutputs = await cleanupSchedule(cleanupScheduleInputs)
 
     this.state.name = inputs.name
     this.state.region = inputs.region
     await this.save()
 
-    const outputs = { ...lambdaOutputs, rate: inputs.rate || '1m', enabled: inputs.enabled }
+    const outputs = {
+      userFunctionName: scheduleOutputs.name,
+      cleanupFunctionName: cleanupScheduleOutputs.name,
+      userScheduleTime: `${date.toISOString()}`,
+      cleanupScheduleTime: `${cleanupDate.toISOString()}`,
+      userScheduleName: `${inputs.name}-user`,
+      cleanupScheduleName: `${inputs.name}-cleanup`
+    }
 
     return outputs
   }
@@ -180,48 +95,12 @@ class Schedule extends Component {
 
   async remove() {
     this.context.status('Removing')
-    if (!this.state.name) {
-      this.context.debug(`Aborting CloudWatch rule removal. Name not found in state.`)
-      return
-    }
-    const cloudWatchEvents = new AWS.CloudWatchEvents({
-      region: this.state.region,
-      credentials: this.context.credentials.aws
-    })
 
-    const removeTargetsParams = {
-      Rule: this.state.name,
-      Ids: [this.state.name]
-    }
+    const userSchedule = await this.load('@serverless/schedule', 'UserSchedule')
+    const cleanupSchedule = await this.load('@serverless/schedule', 'CleanupSchedule')
 
-    try {
-      this.context.debug(`Removing CloudWatch targets for rule ${this.state.name}.`)
-      await cloudWatchEvents.removeTargets(removeTargetsParams).promise()
-    } catch (error) {
-      if (error.code !== 'ResourceNotFoundException') {
-        throw error
-      }
-    }
-
-    const deleteRuleParams = {
-      Name: this.state.name
-    }
-
-    try {
-      this.context.debug(`Removing rule ${this.state.name} from the ${this.state.region} region.`)
-      await cloudWatchEvents.deleteRule(deleteRuleParams).promise()
-    } catch (error) {
-      if (error.code !== 'InternalException') {
-        throw error
-      }
-    }
-
-    const awsLambda = await this.load('@serverless/aws-lambda')
-    await awsLambda.remove()
-
-    this.context.debug(
-      `Schedule ${this.state.name} was successfully removed from the ${this.state.region} region.`
-    )
+    await userSchedule.remove({ name: `${this.state.name}-user` })
+    await cleanupSchedule.remove({ name: `${this.state.name}-cleanup` })
 
     this.state = {}
     await this.save()

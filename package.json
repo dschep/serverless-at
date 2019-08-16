@@ -1,7 +1,10 @@
 {
-  "name": "@serverless/schedule",
-  "version": "2.1.0",
+  "name": "serverless-at",
+  "version": "1.0.0",
   "main": "./serverless.js",
+  "bin": {
+    "sls-at": "cli.js"
+  },
   "publishConfig": {
     "access": "public"
   },
@@ -12,9 +15,10 @@
   "author": "Serverless, Inc.",
   "license": "Apache",
   "dependencies": {
-    "@serverless/aws-lambda": "^1.2.0",
+    "@serverless/cli": "^1.0.3",
     "@serverless/core": "^1.0.0",
-    "aws-sdk": "^2.488.0"
+    "@serverless/schedule": "^2.0.1",
+    "minimist": "^1.2.0"
   },
   "devDependencies": {
     "babel-eslint": "9.0.0",

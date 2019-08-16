@@ -1,96 +1,31 @@
-![serverless scheduled task aws lambda](https://s3.amazonaws.com/assets.github.serverless/readme-serverless-schedule.png)
+# :zap::alarm_clock: Serverless `at`
 
-# schedule
-
-&nbsp;
-
-Instantly run scheduled cron jobs on AWS Lambda using [Serverless Components](https://github.com/serverless/components).
-
-&nbsp;
+Instantly schedule run onetime jobs on AWS Lambda using
+[Serverless Components](https://github.com/serverless/components). Inspired by the UNIX `at`
+command.
 
 1. [Install](#1-install)
-2. [Create](#2-create)
-3. [Configure](#3-configure)
-4. [Deploy](#4-deploy)
-
-&nbsp;
+2. [Create a script](#2-create-a-script)
+3. [Deploy](#3-deploy)
 
 
 ### 1. Install
 
 ```console
-$ npm install -g serverless
+$ npm install -g dschep/serverless-at
 ```
 
-### 2. Create
+### 2. Create a script
+
+Create a file (Python and NodeJS currently supported) containing a lambda handler called `task`.
+Eg: `foo.py` containing:
+```python
+def task(event, context):
+    print('huzzah')
+```
+
+### 3. Deploy
 
 ```console
-$ mkdir schedule && cd schedule
+$ sls-at foo.py 2019-08-16T12:00:00
 ```
-
-The directory should look something like this:
-
-
-```
-|- index.js
-|- serverless.yml
-|- package.json # optional
-|- .env         # your AWS api keys
-```
-
-the `.env` file should look like this
-
-```
-AWS_ACCESS_KEY_ID=XXX
-AWS_SECRET_ACCESS_KEY=XXX
-```
-
-The `index.js` file should contain your scheduling code.  It must export a module named `task`:
-
-```js
-module.exports.task = async (e, ctx, cb) => {
-  console.log('running in schedule')
-}
-```
-
-### 3. Configure
-
-All the following inputs are optional. However, they allow you to configure your Lambda compute instance and pass environment variables.
-
-```yml
-# serverless.yml
-
-mySchedule:
-  component: "@serverless/schedule"
-  inputs:
-    code:
-      src: ./code # The root folder containing the index.js file
-      build: build # The folder within your 'src' directory containing your built artifacts
-      hook: npm run build # A hook to build/test/do anything
-
-    handler: foo.bar # optional - specifies handler file & function. eg: foo.js instead of index.js and bar instead of task
-    runtime: nodejs10.x # default
-
-    # you can provide a rate either as rate with
-    # this format <amount><unit-character> (e.g. 1s, 5m, 2h)
-    # or a cron expresion  
-    rate: 5m
-    enabled: true # this is the default value
-    region: us-east-1
-    memory: 128
-    timeout: 10
-    env:
-      TABLE_NAME: my-table
-```
-
-### 4. Deploy
-
-```console
-$ serverless
-```
-
-&nbsp;
-
-### New to Components?
-
-Checkout the [Serverless Components](https://github.com/serverless/components) repo for more information.
