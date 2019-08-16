@@ -32,7 +32,7 @@ The directory should look something like this:
 
 
 ```
-|- schedule.js
+|- index.js
 |- serverless.yml
 |- package.json # optional
 |- .env         # your AWS api keys
@@ -45,7 +45,7 @@ AWS_ACCESS_KEY_ID=XXX
 AWS_SECRET_ACCESS_KEY=XXX
 ```
 
-The `schedule.js` file should contain your scheduling code.  It must export a module named `task`:
+The `index.js` file should contain your scheduling code.  It must export a module named `task`:
 
 ```js
 module.exports.task = async (e, ctx, cb) => {
@@ -64,7 +64,7 @@ mySchedule:
   component: "@serverless/schedule"
   inputs:
     code:
-      src: ./code # The root folder containing the schedule.js file
+      src: ./code # The root folder containing the index.js file
       build: build # The folder within your 'src' directory containing your built artifacts
       hook: npm run build # A hook to build/test/do anything
 
