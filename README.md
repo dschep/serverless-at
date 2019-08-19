@@ -39,3 +39,6 @@ module.exports.task = async () => {
 ```console
 $ sls-at foo.py 2019-08-16T12:00:00
 ```
+
+The 1st argument is your script containing a `task` lambda handler function,
+the 2nd is an [EcmaScript date](http://www.ecma-international.org/ecma-262/5.1/#sec-15.9.1.15).

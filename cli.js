@@ -31,7 +31,7 @@ const runComponents = async () => {
     const outputs = await component({ file, at })
 
     process.stdout.write(`\rDeploying ${file} to run at ${at}...Done\n`)
-    console.log(outputs)
+    if (args.debug) console.debug(outputs)
     process.exit(0)
   } catch (e) {
     console.error(e)
