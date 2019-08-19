@@ -1,6 +1,6 @@
 # :zap::alarm_clock: Serverless `at`
 
-Instantly schedule run onetime jobs on AWS Lambda using
+Instantly schedule one-time jobs to run on AWS Lambda using
 [Serverless Components](https://github.com/serverless/components). Inspired by the UNIX `at`
 command.
 
