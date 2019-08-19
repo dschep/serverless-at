@@ -17,10 +17,16 @@ $ npm install -g dschep/serverless-at
 
 ### 2. Create a script
 
-Create a file (NodeJS currently supported,
-Python once serverless-components/schedule#2 merged&released) containing
+Create a file (Python & NodeJS currently supported) containing
 a lambda handler called `task`.
-Eg: `foo.js` containing:
+Eg: `foo.py` containing:
+```python
+def task(event, context):
+    print('huzzah')
+    return
+```
+
+or: `foo.js` containing:
 ```javascript
 module.exports.task = async () => {
     console.log('huzzah')

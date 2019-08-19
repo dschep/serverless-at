@@ -2,7 +2,7 @@
 
 const path = require('path')
 const args = require('minimist')(process.argv.slice(2))
-const Context = require('@serverless/cli/src/Context')
+const { Context } = require('@serverless/core')
 const Component = require('./serverless.js')
 
 const runComponents = async () => {
@@ -24,17 +24,17 @@ const runComponents = async () => {
   }
 
   try {
+    process.stdout.write(`Deploying ${file} to run at ${at}...`)
     const component = new Component(undefined, context)
     await component.init()
 
     const outputs = await component({ file, at })
 
-    context.renderOutputs(outputs)
-    context.close('done')
+    process.stdout.write(`\rDeploying ${file} to run at ${at}...Done\n`)
+    console.log(outputs)
     process.exit(0)
   } catch (e) {
-    context.renderError(e)
-    context.close('error', e)
+    console.error(e)
     process.exit(1)
   }
 }
