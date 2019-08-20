@@ -35,8 +35,7 @@ class Schedule extends Component {
     inputs.handler = `${handlerBase}.task`
 
     const date = new Date(inputs.at)
-    const userCronttab = `${date.getMinutes()} ${date.getHours()} ${date.getDate()} ${date.getMonth() +
-      1} ? ${date.getFullYear()}`
+    const userCronttab = `${date.getMinutes() + date.getTimezoneOffset() % 60} ${date.getHours() + Math.floor(date.getTimezoneOffset()/60)} ${date.getDate()} ${date.getMonth() + 1} ? ${date.getFullYear()}`
     const cleanupDelay = Math.ceil(inputs.timeout / 60)
     const cleanupDate = new Date(date.getTime() + cleanupDelay * 60000)
     const cleanupCronttab = `${cleanupDate.getMinutes()} ${cleanupDate.getHours()} ${cleanupDate.getDate()} ${cleanupDate.getMonth() +
